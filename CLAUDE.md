@@ -92,6 +92,7 @@ The default 16:9 slide templates include:
 - `title-tags`, `split`, `stat`, `evolution-flow`, `kindergarten-notice` when the relevant sub-skill is available
 
 For `image-right` and `image-left`, explicitly assign `.text-side` and `.visual` to grid columns so images do not drop below the text in the overview or rendered deck.
+Overview pages must also override the preview display model: `.detail-frame .scene.image-right.active` and `.detail-frame .scene.image-left.active` should use `display: grid`, because the generic overview preview forces active slides to `display: flex`.
 
 ## Typography
 

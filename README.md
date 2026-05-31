@@ -108,6 +108,8 @@ The bundle includes side-image templates for editable teaching decks:
 
 These templates explicitly lock text and image into separate grid columns, so the image stays beside the text instead of falling below it.
 
+Overview preview CSS also keeps these templates as grid layouts. This prevents the generic active-slide preview rule from forcing them back to flex and pushing the image below the text.
+
 ## Notes
 
 This is not the original upstream repository. It is a customized working bundle intended for local AI-assisted slide production with HyperFrames.

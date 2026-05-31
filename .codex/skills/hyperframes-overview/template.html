@@ -79,6 +79,10 @@
         display: flex;
         pointer-events: none;
       }
+      .thumb .scene.image-right,
+      .thumb .scene.image-left {
+        display: grid;
+      }
       .thumb-label {
         position: absolute; top: 4px; left: 6px;
         background: rgba(0, 0, 0, 0.82); color: #fff;
@@ -173,6 +177,10 @@
         display: none;
       }
       .detail-frame .scene.active { display: flex; }
+      .detail-frame .scene.image-right.active,
+      .detail-frame .scene.image-left.active {
+        display: grid;
+      }
 
       /* ============ Aim inspector ============ */
       .header-right { display: flex; align-items: center; gap: 14px; }
@@ -343,6 +351,12 @@
           transform: none;
           break-after: page;
           page-break-after: always;
+        }
+        .detail-frame .scene.image-right,
+        .detail-frame .scene.image-right.active,
+        .detail-frame .scene.image-left,
+        .detail-frame .scene.image-left.active {
+          display: grid !important;
         }
         .detail-frame .scene:last-child {
           break-after: auto;
