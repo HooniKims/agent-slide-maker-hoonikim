@@ -1,0 +1,225 @@
+<!-- ============ Text Edit mode JS (16:9 슬라이드 variant — data-slide) ============
+     사용: 16:9 슬라이드덱 overview.html (1920×1080).
+     삽입 위치: IIFE 안, 마지막 `})();` 직전.
+     카드뉴스 variant와의 차이: data-slide 셀렉터 / Slide 라벨. -->
+
+        /* ============ Text Edit mode (16:9 slide variant — data-slide) ============ */
+        const editBtn = document.getElementById('nav-edit');
+        const undoBtn = document.getElementById('nav-undo');
+        const redoBtn = document.getElementById('nav-redo');
+        const INLINE_TAGS = new Set(['SPAN','EM','STRONG','B','I','U','A','BR','CODE','MARK','SMALL']);
+
+        function isTextOnlyLeaf(el) {
+          if (!el.children.length) return true;
+          return Array.from(el.children).every(c => INLINE_TAGS.has(c.tagName) && isTextOnlyLeaf(c));
+        }
+
+        function findEditableElements(scope) {
+          const out = [];
+          const walk = (el) => {
+            if (el.hasAttribute('aria-hidden')) return;
+            if (el.tagName === 'IMG' || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return;
+            if (isTextOnlyLeaf(el) && el.textContent.trim()) {
+              out.push(el);
+            } else {
+              Array.from(el.children).forEach(walk);
+            }
+          };
+          Array.from(scope.children).forEach(walk);
+          return out;
+        }
+
+        const origTexts = new Map();
+        let editMode = false;
+        let editHistory = [];
+        let redoHistory = [];
+        let inputTimer = null;
+        let restoringEdit = false;
+
+        function cleanSlideHTML(slide) {
+          const clone = slide.cloneNode(true);
+          clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+          return clone.innerHTML;
+        }
+
+        function editSnapshot() {
+          return {
+            active: typeof active === 'number' ? active : (typeof current === 'number' ? current : 1),
+            slides: Array.from(document.querySelectorAll('#detail-frame [data-slide]')).map(cleanSlideHTML),
+          };
+        }
+
+        function sameSnapshot(a, b) {
+          return JSON.stringify(a) === JSON.stringify(b);
+        }
+
+        function updateHistoryButtons() {
+          if (undoBtn) undoBtn.disabled = editHistory.length <= 1;
+          if (redoBtn) redoBtn.disabled = redoHistory.length === 0;
+        }
+
+        function pushEditHistory() {
+          if (restoringEdit) return;
+          const snap = editSnapshot();
+          if (editHistory.length && sameSnapshot(editHistory[editHistory.length - 1], snap)) {
+            updateHistoryButtons();
+            return;
+          }
+          editHistory.push(snap);
+          if (editHistory.length > 100) editHistory.shift();
+          redoHistory = [];
+          updateHistoryButtons();
+        }
+
+        function restoreEditSnapshot(snap) {
+          restoringEdit = true;
+          const slides = Array.from(document.querySelectorAll('#detail-frame [data-slide]'));
+          slides.forEach((slide, i) => { slide.innerHTML = snap.slides[i] || slide.innerHTML; });
+          if (editMode) {
+            slides.forEach(slide => {
+              findEditableElements(slide).forEach(el => {
+                if (!origTexts.has(el)) origTexts.set(el, el.innerHTML);
+                el.contentEditable = 'true';
+                el.spellcheck = false;
+              });
+            });
+          }
+          if (typeof setActive === 'function') setActive(snap.active || 1);
+          if (typeof syncThumbFromScene === 'function') slides.forEach(slide => syncThumbFromScene(parseInt(slide.dataset.slide, 10)));
+          restoringEdit = false;
+          updateHistoryButtons();
+        }
+
+        function undoEdit() {
+          if (editHistory.length <= 1) return;
+          const cur = editHistory.pop();
+          redoHistory.push(cur);
+          restoreEditSnapshot(editHistory[editHistory.length - 1]);
+        }
+
+        function redoEdit() {
+          if (!redoHistory.length) return;
+          const next = redoHistory.pop();
+          editHistory.push(next);
+          restoreEditSnapshot(next);
+        }
+
+        function scheduleEditHistory() {
+          clearTimeout(inputTimer);
+          inputTimer = setTimeout(() => {
+            pushEditHistory();
+            if (typeof syncThumbFromScene === 'function') {
+              document.querySelectorAll('#detail-frame [data-slide]').forEach(slide => syncThumbFromScene(parseInt(slide.dataset.slide, 10)));
+            }
+          }, 280);
+        }
+
+        function simpleSelectorFromSlide(el) {
+          if (!el.className || typeof el.className !== 'string') return el.tagName.toLowerCase();
+          const parts = el.className.trim().split(/\s+/).filter(c => c && c !== 'active' && !c.startsWith('aim-') && !c.startsWith('edit-'));
+          return parts.length ? '.' + parts.join('.') : el.tagName.toLowerCase();
+        }
+
+        function enterEditMode() {
+          editMode = true;
+          document.body.classList.add('edit-mode');
+          editBtn.classList.add('active');
+          editBtn.textContent = 'Done';
+          document.querySelectorAll('#detail-frame [data-slide]').forEach(slide => {
+            findEditableElements(slide).forEach(el => {
+              origTexts.set(el, el.innerHTML);
+              el.contentEditable = 'true';
+              el.spellcheck = false;
+            });
+          });
+          pushEditHistory();
+        }
+
+        function exitEditMode() {
+          editMode = false;
+          document.body.classList.remove('edit-mode');
+          editBtn.classList.remove('active');
+          editBtn.textContent = 'Edit';
+          const bySlide = new Map();
+          origTexts.forEach((origHTML, el) => {
+            el.removeAttribute('contenteditable');
+            const curHTML = el.innerHTML;
+            if (origHTML.trim() !== curHTML.trim()) {
+              const slide = el.closest('[data-slide]');
+              const num = slide ? slide.dataset.slide : '?';
+              const skill = slide ? (slide.dataset.skill || '') : '';
+              const sel = simpleSelectorFromSlide(el);
+              if (!bySlide.has(num)) bySlide.set(num, { skill, changes: [] });
+              bySlide.get(num).changes.push({ sel, old: origHTML.trim(), new: curHTML.trim() });
+            }
+          });
+          origTexts.clear();
+          const totalChanges = Array.from(bySlide.values()).reduce((a, v) => a + v.changes.length, 0);
+          if (totalChanges > 0) {
+            if (typeof syncThumbFromScene === 'function') {
+              Array.from(bySlide.keys()).forEach(num => syncThumbFromScene(parseInt(num, 10)));
+            }
+            const topic = document.title.replace(/ · Card Overview.*$/, '').replace(/ · Overview.*$/, '');
+            let patch = `# Overview edits — ${topic} (${totalChanges} change${totalChanges === 1 ? '' : 's'})\n\n`;
+            Array.from(bySlide.keys()).sort((a, b) => parseInt(a) - parseInt(b)).forEach(num => {
+              const { skill, changes } = bySlide.get(num);
+              patch += `## Slide ${num}${skill ? ' (' + skill + ')' : ''}\n`;
+              changes.forEach(c => {
+                patch += `- ${c.sel}\n  OLD: ${c.old}\n  NEW: ${c.new}\n`;
+              });
+              patch += '\n';
+            });
+            // Try POST /save (live server); fall back to clipboard (static server)
+            fetch('/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ patch: patch }),
+            }).then(r => {
+              if (!r.ok) throw new Error('save failed: ' + r.status);
+              return r.json();
+            }).then(result => {
+              toast.innerHTML =
+                '<div class="toast-title">✓ ' + result.applied + '건 반영됨 (파일 직접 수정)</div>' +
+                '<div class="toast-sel">오른쪽 화면과 왼쪽 썸네일이 함께 갱신됨</div>';
+              toast.classList.add('show');
+              if (toastTimer) clearTimeout(toastTimer);
+              toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+            }).catch(() => {
+              copyToClipboard(patch).then(() => {
+                toast.innerHTML =
+                  '<div class="toast-title">✎ ' + totalChanges + '개 변경 클립보드 복사됨</div>' +
+                  '<div class="toast-sel">정적 서버 — 대화창에 붙여넣어 agent 반영 요청</div>';
+                toast.classList.add('show');
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => toast.classList.remove('show'), 4500);
+              });
+            });
+          }
+        }
+
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (editMode) exitEditMode(); else enterEditMode();
+        });
+        if (undoBtn) undoBtn.addEventListener('click', (e) => { e.stopPropagation(); undoEdit(); });
+        if (redoBtn) redoBtn.addEventListener('click', (e) => { e.stopPropagation(); redoEdit(); });
+        document.addEventListener('input', (e) => {
+          if (editMode && e.target && e.target.isContentEditable) scheduleEditHistory();
+        }, true);
+
+        document.addEventListener('keydown', (e) => {
+          if (editMode && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            e.shiftKey ? redoEdit() : undoEdit();
+            return;
+          }
+          if (editMode && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            redoEdit();
+            return;
+          }
+          if (editMode && document.activeElement && document.activeElement.isContentEditable) {
+            e.stopPropagation();
+          }
+        }, true);
+        pushEditHistory();
