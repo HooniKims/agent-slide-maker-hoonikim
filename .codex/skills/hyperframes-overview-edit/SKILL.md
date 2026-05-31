@@ -160,3 +160,14 @@ bash .codex/skills/hyperframes-overview-edit/serve-live.sh topics/<주제> <포�
 - `hyperframes-overview` — 16:9 슬라이드덱용 overview 생성기 (이 스킬과 짝)
 - `hyperframes-card-news` — 카드뉴스 overview 생성기 (이 스킬과 짝)
 - AGENTS.md — "Review Workflow — Overview First, Render Second" 섹션에 이 기능 사용법 문서화
+
+## Image Crop Controls
+
+When Edit mode selects an image, the image tool group should include:
+
+- `왼쪽`, `오른쪽`, `위로`, `아래로`: move the image inside its visible frame.
+- `작게`, `크게`: scale the image with CSS transform.
+- `가로 좁게`, `가로 넓게`: shrink or expand the visible parent frame width.
+- `세로 낮게`, `세로 높게`: shrink or expand the visible parent frame height.
+
+Crop controls must not rewrite or permanently crop the source image file. Treat the image parent, usually `.visual`, as the crop frame. Set `overflow: hidden` on that parent and persist the parent `width` / `height` style through the same layout history and Done/save path used by other layout edits.

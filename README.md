@@ -27,6 +27,7 @@ It is designed to help an AI coding agent create slide decks, generate an editab
 - Edit slide text directly in the overview
 - Select elements with Aim-style selectors
 - Resize selected text or layout elements
+- Crop selected images by resizing the visible image frame while preserving the source image file
 - Delete and restore selected elements
 - Undo and Redo edits with buttons and keyboard shortcuts
 - Export deck results as image, PDF, or PPTX when the project template supports it

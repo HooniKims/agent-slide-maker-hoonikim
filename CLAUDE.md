@@ -62,6 +62,7 @@ Every generated overview must include the edit safety features below.
 - Include top-bar Undo and Redo buttons: `#nav-undo` and `#nav-redo`.
 - Support keyboard shortcuts: `Ctrl+Z` for Undo, `Ctrl+Y` and `Ctrl+Shift+Z` for Redo.
 - Record text edits, element size changes, deletion, and restoration in the history stack.
+- When an image is selected in Edit mode, provide image move, scale, and crop controls. Crop controls should resize the visible parent frame with `overflow: hidden` instead of permanently editing the image file.
 - While a `contenteditable` element is focused, do not let Backspace, Delete, Space, or arrow keys leak into global navigation or element deletion handlers.
 - Edit mode must not make text disappear when the user types, deletes text, or presses Done.
 - When restoring a history snapshot, refresh thumbnails and keep editable text elements editable if Edit mode is still active.
