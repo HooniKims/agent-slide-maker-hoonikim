@@ -53,6 +53,14 @@ grep -L "class=\"edit-btn\"" topics/*/overview.html
 <button class="edit-btn" id="nav-edit" aria-label="text edit">Edit</button>
 ```
 
+요소 선택/크기 조절을 제공하는 overview라면 버튼을 항상 노출하지 않는다. `Edit` 상태에서 선택된 요소 종류에 따라 아래처럼 한글 도구만 전환한다.
+
+- 텍스트/일반 요소 선택: `폭 줄이기`, `폭 늘리기`, `글자 작게`, `글자 크게`
+- 이미지 선택: `왼쪽`, `오른쪽`, `위로`, `아래로`, `작게`, `크게`
+- 삭제: `삭제`
+- 영문 약어 `W`, `T`, `X`, `Y`, `Z`는 초보자가 이해하기 어렵기 때문에 UI에 그대로 노출하지 않는다.
+- 기본 CSS 상태는 `.text-tool`, `.image-tool`, `.delete-btn { display:none; }`이고, `body.edit-mode.tool-text` 또는 `body.edit-mode.tool-image`일 때만 해당 그룹을 보여준다.
+
 ### Step 3: JS 삽입 (variant 선택)
 
 IIFE 마지막 `})()` 직전에 Text Edit mode 블록을 삽입한다. **overview의 카드/슬라이드 앵커 속성에 따라 2종 중 하나 선택**:
@@ -126,6 +134,7 @@ bash .codex/skills/hyperframes-overview-edit/serve-live.sh topics/<주제> <포�
 - **인라인 태그 보존** — `<em>`, `<strong>`, `<br>`, `<span>` 등은 innerHTML 레벨에서 diff 되므로 편집 중에도 유지됨
 - **Undo/Redo 필수** — Edit 중 `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`와 상단 `↶/↷` 버튼이 동작해야 한다.
 - **contentEditable 키 충돌 금지** — 편집 중 일반 Backspace/Delete/방향키 입력이 카드/슬라이드 이동이나 요소 삭제 로직으로 새면 안 된다. 단 `Ctrl+Z/Y` 계열은 Undo/Redo로 처리한다.
+- **상황별 도구 전환 필수** — Edit 모드에서 이미지가 선택되면 이미지 이동/크롭 도구만 보여주고, 텍스트나 다른 요소를 선택하면 텍스트/폭 조절 도구로 되돌린다. 모든 버튼 라벨은 초보자도 이해할 수 있는 한글 표현을 사용한다.
 - **세션 내 일시 저장** — 새로고침 전에 Done 클릭해 패치 복사할 것
 - **썸네일 동기화** — Done 클릭 시 변경된 카드/슬라이드의 좌측 스트립 썸네일 clone을 오른쪽 최신 DOM에서 즉시 재생성한다. PDF/내보내기 전에 새로고침할 필요가 없게 유지해야 한다.
 - **썸네일 렌더 일치** — 좌측 썸네일은 유지하되, 우측 편집 화면과 같은 display 모델을 써야 한다. 16:9 슬라이드는 `.thumb .scene { display: flex; }`, 카드뉴스는 `.thumb .card { display: flex; }` 를 명시한다. 이 규칙이 빠지면 같은 DOM clone이어도 flex 레이아웃이 달라져 썸네일과 편집 화면이 다르게 보인다.

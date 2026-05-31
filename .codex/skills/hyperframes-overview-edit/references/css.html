@@ -29,6 +29,28 @@
       }
       .history-btn:hover { border-color: #2196F3; color: #2196F3; }
       .history-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+      .size-btn {
+        padding: 7px 11px; border-radius: 8px;
+        background: var(--ui-card);
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        color: var(--ui-text);
+        cursor: pointer; font-size: 13px; font-weight: 700;
+        font-family: inherit;
+      }
+      .delete-btn {
+        padding: 7px 11px; border-radius: 8px;
+        background: #241913; color: #ffedd7;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        cursor: pointer; font-size: 13px; font-weight: 700;
+        font-family: inherit;
+      }
+      .text-tool,
+      .image-tool,
+      .delete-btn { display: none; }
+      body.edit-mode .export-btn { display: none; }
+      body.edit-mode.tool-text .text-tool,
+      body.edit-mode.tool-image .image-tool,
+      body.edit-mode .delete-btn { display: inline-flex; }
       body.edit-mode #detail-frame [contenteditable="true"] {
         outline: 2px dashed rgba(33, 150, 243, 0.45);
         outline-offset: 2px;
