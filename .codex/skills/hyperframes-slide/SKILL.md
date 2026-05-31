@@ -112,3 +112,28 @@ description: >-
 - live/static 서빙 흐름 제공
 
 슬라이드 타입 표, 하위 스킬 선택, `data-skill` 허용 목록은 이 `hyperframes-slide` 스킬이 담당한다. overview를 만들거나 갱신할 때도 이 스킬의 타입 결정을 먼저 따른다.
+
+## Image Side Templates
+
+Use these as first-class slide templates when a single image must sit beside text:
+
+| `data-skill` | Sub-skill | Use |
+|---|---|---|
+| `image-right` | `hyperframes-slide-work-image-right` | Text, bullets, note, or QR on the left; one main image on the right |
+| `image-left` | `hyperframes-slide-work-image-left` | One main image on the left; text, bullets, note, or QR on the right |
+
+Prefer `image-right` when the reading path starts with the headline and bullets. Prefer `image-left` when the visual should be seen first, such as a screenshot, product view, or metaphor image that anchors the explanation.
+
+CSS baseline:
+
+```css
+.image-right,.image-left{display:grid;grid-template-rows:1fr;gap:56px;align-items:center}
+.image-right{grid-template-columns:0.78fr 1.22fr}
+.image-left{grid-template-columns:1.22fr 0.78fr}
+.image-right .text-side{grid-column:1;grid-row:1}
+.image-right .visual{grid-column:2;grid-row:1}
+.image-left .visual{grid-column:1;grid-row:1}
+.image-left .text-side{grid-column:2;grid-row:1}
+.image-right .visual,.image-left .visual{height:690px;overflow:hidden}
+.image-right .visual img,.image-left .visual img{width:100%;height:100%;object-fit:contain;object-position:center center}
+```

@@ -22,6 +22,7 @@ It is designed to help an AI coding agent create slide decks, generate an editab
 ## Main Features
 
 - Create 16:9 presentation slides with HyperFrames
+- Use default slide templates including `title`, `quote`, `steps`, `title-bullets`, `compare`, `title-image`, `image-right`, and `image-left`
 - Generate a static `overview.html` for review
 - Edit slide text directly in the overview
 - Select elements with Aim-style selectors
@@ -97,6 +98,15 @@ Default typography guidance:
 - Letter spacing: `-0.02em`
 - Line height: around `1.5`
 - Prefer visual metaphors for conceptual slide images
+
+## Slide Templates
+
+The bundle includes side-image templates for editable teaching decks:
+
+- `image-right`: text, bullets, note, or QR on the left; one main image on the right
+- `image-left`: one main image on the left; text, bullets, note, or QR on the right
+
+These templates explicitly lock text and image into separate grid columns, so the image stays beside the text instead of falling below it.
 
 ## Notes
 

@@ -77,6 +77,22 @@ Before creating a new composition, check the local design source.
 4. For this slide style, default to `letter-spacing: -0.02em` and `line-height: 1.5` unless the design asset says otherwise.
 5. Prefer visual metaphors for generated images when the slide is conceptual.
 
+## Slide Layout Templates
+
+The default 16:9 slide templates include:
+
+- `title`: title and optional subtitle only
+- `quote`: one large central question or quote
+- `steps`: numbered or sequenced process
+- `title-bullets`: title with bullet explanation
+- `compare`: two to four comparison columns
+- `title-image`: title with one representative image
+- `image-right`: text, bullets, note, or QR on the left with one main image on the right
+- `image-left`: one main image on the left with text, bullets, note, or QR on the right
+- `title-tags`, `split`, `stat`, `evolution-flow`, `kindergarten-notice` when the relevant sub-skill is available
+
+For `image-right` and `image-left`, explicitly assign `.text-side` and `.visual` to grid columns so images do not drop below the text in the overview or rendered deck.
+
 ## Typography
 
 Use Paperlogy as the default Korean web font for new compositions, card news, and overview pages unless a design set specifies a different font.
