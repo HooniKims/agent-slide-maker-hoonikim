@@ -78,7 +78,7 @@ IIFE 마지막 `})()` 직전에 Text Edit mode 블록을 삽입한다. **overvie
 
 ### 1. Live 모드 (권장) — `serve-live.sh`
 
-POST `/save` 엔드포인트가 있는 Python 서버. Done 버튼 클릭 시 브라우저가 `fetch('/save', ...)` 로 패치를 서버에 POST → 서버가 `index.html` + `overview.html` 을 **파일에 즉시 반영**.
+POST `/save` 엔드포인트가 있는 Python 서버. Done 버튼 클릭 시 브라우저가 패치를 **먼저 클립보드에 복사**하고, 이어서 `fetch('/save', ...)` 로 서버에 POST한다. 서버는 `index.html` + `overview.html` 을 **파일에 즉시 반영**한다.
 
 ```bash
 bash .codex/skills/hyperframes-overview-edit/serve-live.sh topics/<주제> <포트>
@@ -95,11 +95,11 @@ bash .codex/skills/hyperframes-overview-edit/serve-live.sh topics/<주제> <포�
 - 토스트: "✎ N개 변경 클립보드 복사됨 — 대화창에 붙여넣어 agent 반영 요청"
 - 사용자가 대화에 패치 붙여넣음 → agent 가 `references/patch-parser.md` 따라 반영
 
-> 브라우저 측 코드는 **항상 live 를 먼저 시도**하고 실패 시 clipboard 로 폴백. 두 모드 모두 투명하게 지원된다.
+> 브라우저 측 코드는 **항상 clipboard 복사를 먼저 수행**하고 live 저장을 추가로 시도한다. live 저장이 실패해도 사용자는 같은 패치를 대화창에 붙여넣어 agent에게 반영 요청할 수 있다.
 
 ## 패치 포맷
 
-사용자가 Done 버튼 클릭 시 클립보드에 아래 포맷이 복사되거나(static), live 서버의 `/save` 엔드포인트로 전송됨:
+사용자가 Done 버튼 클릭 시 아래 포맷이 항상 클립보드에 복사되고, live 서버가 있으면 같은 내용이 `/save` 엔드포인트로도 전송됨:
 
 ```
 # Overview edits — <topic-id> (N change(s))
@@ -148,7 +148,7 @@ bash .codex/skills/hyperframes-overview-edit/serve-live.sh topics/<주제> <포�
 - [ ] 클릭 시 텍스트 요소들에 파란 점선 아웃라인이 뜨는지 (호버 시 진해지고, 포커스 시 실선)
 - [ ] 상단 `↶/↷` 버튼이 보이고, `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`가 동작하는지
 - [ ] contentEditable 안에서 Backspace/Delete로 글자를 지워도 텍스트 요소 전체가 사라지지 않는지
-- [ ] 한 단어 수정 후 Done 누르면 live 서버에서는 "✓ N건 반영됨", static 서버에서는 "✎ N개 변경 클립보드 복사됨" 토스트가 뜨는지
+- [ ] 한 단어 수정 후 Done 누르면 live 서버에서는 "✓ N건 저장/복사됨", static 서버에서는 "✎ N개 변경 클립보드 복사됨" 토스트가 뜨는지
 - [ ] Done 후 왼쪽 축소 썸네일이 오른쪽 편집 화면과 같은 레이아웃/텍스트로 즉시 갱신되는지
 - [ ] PDF/print 결과가 왼쪽 strip 없이 원본 슬라이드/카드 페이지만 포함하는지
 - [ ] static 서버 fallback에서 붙여넣기한 패치가 위 포맷과 정확히 일치하는지

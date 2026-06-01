@@ -91,18 +91,20 @@ def find_card_block(html, card_kind, card_num):
     for a in attrs:
         idx = html.find(a)
         if idx != -1:
+            section_idx = html.rfind('<section', 0, idx)
             div_idx = html.rfind('<div', 0, idx)
-            if div_idx != -1:
-                start = div_idx
+            block_idx = max(section_idx, div_idx)
+            if block_idx != -1:
+                start = block_idx
                 break
     if start == -1:
         return None, None
 
     # Find the start of the NEXT sibling card as the end anchor
     if card_kind == 'card':
-        next_re = re.compile(r'<div\s[^>]*?(?:data-card="(\d+)"|id="c-(\d+)")')
+        next_re = re.compile(r'<(?:div|section)\s[^>]*?(?:data-card="(\d+)"|id="c-(\d+)")')
     else:
-        next_re = re.compile(r'<div\s[^>]*?(?:data-slide="(\d+)"|id="s-(\d+)")')
+        next_re = re.compile(r'<(?:div|section)\s[^>]*?(?:data-slide="(\d+)"|id="s-(\d+)")')
 
     end = len(html)
     for m in next_re.finditer(html, start + 4):
@@ -166,7 +168,78 @@ def apply_change_to_html(html, change):
     return html[:start] + new_block + html[end:], True
 
 
+def _find_orderable_blocks(html):
+    """Find top-level slide/card blocks stored as <section> or <div>."""
+    blocks = []
+    start_re = re.compile(r'<(section|div)\b[^>]*(?:data-(?:slide|card)="\d+"|class="[^"]*(?:scene|card)[^"]*")[^>]*>', re.DOTALL)
+    for m in start_re.finditer(html):
+        tag = m.group(1)
+        open_tag = m.group(0)
+        if not (
+            re.search(r'data-(?:slide|card)="\d+"', open_tag)
+            and re.search(r'class="[^"]*(?:scene|card)[^"]*"', open_tag)
+        ):
+            continue
+
+        pos = m.end()
+        depth = 1
+        tag_re = re.compile(rf'</?{tag}\b[^>]*>', re.DOTALL)
+        for tm in tag_re.finditer(html, pos):
+            token = tm.group(0)
+            if token.startswith('</'):
+                depth -= 1
+                if depth == 0:
+                    blocks.append((m.start(), tm.end(), html[m.start():tm.end()]))
+                    break
+            elif not token.endswith('/>'):
+                depth += 1
+    return blocks
+
+
+def reorder_sections_html(html, order):
+    """Reorder top-level slide/card blocks and renumber slide/card metadata."""
+    sections = _find_orderable_blocks(html)
+    if not sections:
+        return html, False
+
+    by_num = {}
+    for start, end, block in sections:
+        num_match = re.search(r'data-(?:slide|card)="(\d+)"|id="s-(\d+)"|id="c-(\d+)"', block)
+        if num_match:
+            num = next(g for g in num_match.groups() if g)
+            by_num[num] = block
+
+    if not order or any(str(num) not in by_num for num in order):
+        return html, False
+
+    ordered = [by_num[str(num)] for num in order]
+    total = len(ordered)
+
+    def renumber(block, idx):
+        n = idx + 1
+        nn = f'{n:02d}'
+        tt = f'{total:02d}'
+        block = re.sub(r'id="s-\d+"', f'id="s-{n}"', block, count=1)
+        block = re.sub(r'id="c-\d+"', f'id="c-{n}"', block, count=1)
+        block = re.sub(r'data-slide="\d+"', f'data-slide="{n}"', block, count=1)
+        block = re.sub(r'data-card="\d+"', f'data-card="{n}"', block, count=1)
+        block = re.sub(r'data-start="[^"]*"', f'data-start="{idx * 7}"', block, count=1)
+        block = re.sub(r'data-track-index="[^"]*"', f'data-track-index="{idx % 2}"', block, count=1)
+        block = re.sub(r'<div class="slide-num">.*?</div>', f'<div class="slide-num">{nn}<span>/</span>{tt}</div>', block, count=1, flags=re.DOTALL)
+        return block
+
+    ordered = [renumber(block, i) for i, block in enumerate(ordered)]
+    start, end = sections[0][0], sections[-1][1]
+    return html[:start] + '\n'.join(ordered) + html[end:], True
+
+
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -175,6 +248,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if self.path == '/save-order':
+            return self._handle_save_order()
+
         if self.path != '/save':
             self.send_error(404, 'Unknown endpoint')
             return
@@ -236,6 +312,46 @@ class Handler(SimpleHTTPRequestHandler):
             'changes_requested': len(changes),
             'files': applied,
         }
+        if errors:
+            response['errors'] = errors
+        self._reply_json(200, response)
+
+    def _handle_save_order(self):
+        length = int(self.headers.get('Content-Length', 0))
+        if length <= 0:
+            self.send_error(400, 'Empty body')
+            return
+
+        raw = self.rfile.read(length).decode('utf-8', errors='replace')
+        try:
+            data = json.loads(raw)
+            order = [str(x) for x in data.get('order', [])]
+        except Exception as e:
+            self.send_error(400, f'Invalid JSON: {e}')
+            return
+
+        if not order:
+            self.send_error(400, 'Missing order')
+            return
+
+        applied = {}
+        errors = []
+        for fname in ('index.html', 'overview.html'):
+            fpath = os.path.join(TOPIC_DIR, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    html = f.read()
+                new_html, ok = reorder_sections_html(html, order)
+                if ok:
+                    with open(fpath, 'w', encoding='utf-8') as f:
+                        f.write(new_html)
+                    applied[fname] = len(order)
+            except Exception as e:
+                errors.append(f'{fname}: reorder failed ({e})')
+
+        response = {'applied': sum(applied.values()), 'files': applied}
         if errors:
             response['errors'] = errors
         self._reply_json(200, response)

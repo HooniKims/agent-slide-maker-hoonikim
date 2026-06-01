@@ -169,7 +169,8 @@
               });
               patch += '\n';
             });
-            // Try POST /save (live server); fall back to clipboard (static server)
+            // Copy immediately while the Done click still grants clipboard access, then try POST /save.
+            const copied = copyToClipboard(patch);
             fetch('/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -178,14 +179,17 @@
               if (!r.ok) throw new Error('save failed: ' + r.status);
               return r.json();
             }).then(result => {
-              toast.innerHTML =
-                '<div class="toast-title">✓ ' + result.applied + '건 반영됨 (파일 직접 수정)</div>' +
-                '<div class="toast-sel">오른쪽 화면과 왼쪽 썸네일이 함께 갱신됨</div>';
-              toast.classList.add('show');
-              if (toastTimer) clearTimeout(toastTimer);
-              toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+              if (!result.applied) throw new Error('save applied 0 changes');
+              copied.then(() => {
+                toast.innerHTML =
+                  '<div class="toast-title">✓ ' + result.applied + '건 저장/복사됨</div>' +
+                  '<div class="toast-sel">파일 반영 완료, 패치도 클립보드에 복사됨</div>';
+                toast.classList.add('show');
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+              });
             }).catch(() => {
-              copyToClipboard(patch).then(() => {
+              copied.then(() => {
                 toast.innerHTML =
                   '<div class="toast-title">✎ ' + totalChanges + '개 변경 클립보드 복사됨</div>' +
                   '<div class="toast-sel">정적 서버 — 대화창에 붙여넣어 agent 반영 요청</div>';

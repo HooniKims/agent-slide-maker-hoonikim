@@ -82,6 +82,12 @@
         transition: border-color 0.15s ease;
       }
       .thumb:hover { border-color: rgba(var(--ui-accent-rgb), 0.45); }
+      .thumb[draggable="true"] { cursor: grab; }
+      .thumb.dragging { opacity: 0.45; }
+      .thumb.drop-target {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.22);
+      }
       .thumb.active {
         border-color: var(--ui-accent);
         box-shadow: rgba(var(--ui-accent-rgb), 0.35) 0px 4px 14px;
@@ -277,6 +283,15 @@
         background: #2196F3; color: #fff; border-color: #2196F3;
         box-shadow: 0 4px 12px rgba(33, 150, 243, 0.35);
       }
+      .order-btn {
+        display: none;
+        padding: 7px 14px; border-radius: 8px;
+        background: var(--ui-accent); color: #111;
+        border: 1px solid var(--ui-accent);
+        cursor: pointer; font-size: 13px; font-weight: 700;
+        font-family: inherit;
+      }
+      body.order-dirty .order-btn { display: inline-flex; }
       body.edit-mode #detail-frame [contenteditable="true"] {
         outline: 2px dashed rgba(33, 150, 243, 0.45);
         outline-offset: 2px;
@@ -375,6 +390,7 @@
       <header class="main-header">
         <div class="main-title">{{TOPIC_ID}} · Card Overview</div>
         <div class="header-right">
+          <button class="order-btn" id="nav-save-order">순서 저장</button>
           <button class="edit-btn" id="nav-edit" aria-label="text edit">Edit</button>
           <button class="aim-btn" id="nav-aim" aria-label="aim inspector">Aim</button>
           <div class="main-nav">
@@ -446,12 +462,101 @@
           label.innerHTML = `<span>${String(n).padStart(2, '0')}</span><code>${skill}</code>`;
           thumb.appendChild(label);
 
-          thumb.addEventListener('click', () => setActive(n));
           stripGrid.appendChild(thumb);
         });
 
         const thumbs = Array.from(stripGrid.querySelectorAll('.thumb'));
+        cards.forEach((card, i) => { card.dataset.sourceCard = card.dataset.card || String(i + 1); });
         let active = 1;
+        let dragIndex = null;
+        let suppressThumbClick = false;
+        const saveOrderBtn = document.getElementById('nav-save-order');
+
+        function renumberCards() {
+          cards.forEach((card, i) => {
+            const n = i + 1;
+            card.id = 'c-' + n;
+            card.dataset.card = String(n);
+          });
+          thumbs.forEach((thumb, i) => {
+            const n = i + 1;
+            thumb.dataset.card = String(n);
+            const label = thumb.querySelector('.thumb-label span');
+            if (label) label.textContent = String(n).padStart(2, '0');
+          });
+        }
+
+        function markOrderDirty() { document.body.classList.add('order-dirty'); }
+        function clearOrderDirty() { document.body.classList.remove('order-dirty'); }
+
+        function moveCard(from, to) {
+          if (from === to || from < 0 || to < 0 || from >= cards.length || to >= cards.length) return;
+          const [card] = cards.splice(from, 1);
+          cards.splice(to, 0, card);
+          const [thumb] = thumbs.splice(from, 1);
+          thumbs.splice(to, 0, thumb);
+          frame.insertBefore(card, cards[to + 1] || null);
+          stripGrid.insertBefore(thumb, thumbs[to + 1] || null);
+          renumberCards();
+          cards.forEach((_, i) => syncThumbFromCard(i + 1));
+          setActive(to + 1);
+          markOrderDirty();
+        }
+
+        thumbs.forEach(thumb => {
+          thumb.draggable = true;
+          thumb.onclick = () => {
+            if (suppressThumbClick) { suppressThumbClick = false; return; }
+            setActive(thumbs.indexOf(thumb) + 1);
+          };
+          thumb.addEventListener('dragstart', (e) => {
+            dragIndex = thumbs.indexOf(thumb);
+            thumb.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(dragIndex));
+          });
+          thumb.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            thumb.classList.add('drop-target');
+            e.dataTransfer.dropEffect = 'move';
+          });
+          thumb.addEventListener('dragleave', () => thumb.classList.remove('drop-target'));
+          thumb.addEventListener('drop', (e) => {
+            e.preventDefault();
+            thumb.classList.remove('drop-target');
+            const to = thumbs.indexOf(thumb);
+            if (dragIndex !== null) {
+              suppressThumbClick = true;
+              moveCard(dragIndex, to);
+            }
+          });
+          thumb.addEventListener('dragend', () => {
+            thumb.classList.remove('dragging');
+            thumbs.forEach(t => t.classList.remove('drop-target'));
+            dragIndex = null;
+          });
+        });
+
+        if (saveOrderBtn) {
+          saveOrderBtn.onclick = () => {
+            const order = cards.map(card => card.dataset.sourceCard);
+            fetch('/save-order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order })
+            }).then(r => {
+              if (!r.ok) throw Error('save order failed');
+              return r.json();
+            }).then(j => {
+              cards.forEach((card, i) => { card.dataset.sourceCard = String(i + 1); });
+              clearOrderDirty();
+              showToast('순서 저장 완료', (j.files && Object.keys(j.files).join(', ')) || 'index.html, overview.html');
+            }).catch(() => {
+              copy('# Card order — {{TOPIC_ID}}\n' + order.join(', '))
+                .then(() => showToast('순서 복사됨', '저장 실패. 대화창에 붙여넣어 주세요.'));
+            });
+          };
+        }
 
         function setActive(n) {
           n = Math.max(1, Math.min(cards.length, n));
