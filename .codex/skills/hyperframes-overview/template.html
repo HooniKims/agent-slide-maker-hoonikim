@@ -806,6 +806,13 @@
           if (!wasActive) scene.classList.remove('active');
           return display;
         }
+        function activeSceneBackground(scene) {
+          const wasActive = scene.classList.contains('active');
+          scene.classList.add('active');
+          const bg = getComputedStyle(scene).backgroundColor || '#000';
+          if (!wasActive) scene.classList.remove('active');
+          return bg === 'rgba(0, 0, 0, 0)' ? '#000' : bg;
+        }
 
         function makeExportScene(scene) {
           const clone = scene.cloneNode(true);
@@ -824,12 +831,13 @@
           if (typeof html2canvas === 'undefined') throw new Error('html2canvas를 불러오지 못했습니다.');
           const scene = scenes[n - 1];
           const stage = document.createElement('div');
-          stage.style.cssText = 'position:fixed;left:-10000px;top:0;width:1920px;height:1080px;background:#000;overflow:hidden;z-index:-1;';
+          const bgColor = activeSceneBackground(scene);
+          stage.style.cssText = `position:fixed;left:-10000px;top:0;width:1920px;height:1080px;background:${bgColor};overflow:hidden;z-index:-1;`;
           const clone = makeExportScene(scene);
           stage.appendChild(clone);
           document.body.appendChild(stage);
           await waitForAssets(stage);
-          const canvas = await html2canvas(clone, { backgroundColor: null, width: 1920, height: 1080, scale: 1, useCORS: true, logging: false });
+          const canvas = await html2canvas(clone, { backgroundColor: bgColor, width: 1920, height: 1080, scale: 1, useCORS: true, logging: false });
           stage.remove();
           return canvas;
         }

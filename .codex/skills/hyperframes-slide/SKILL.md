@@ -12,6 +12,10 @@ description: >-
 
 # HyperFrames Slide Deck
 
+## Export-Safe Backgrounds
+
+PNG/PDF/PPTX export uses html2canvas. Avoid CSS `mask-image` and `-webkit-mask-image` for slide background fades because export may not match the overview. Use real overlay pseudo-elements with gradients, such as `.slide-bg::before` and `.slide-bg::after`, so the overview and export render the same image.
+
 ## 역할
 
 이 스킬은 1920×1080 HyperFrames 슬라이드덱의 **상위 조립 스킬**이다.

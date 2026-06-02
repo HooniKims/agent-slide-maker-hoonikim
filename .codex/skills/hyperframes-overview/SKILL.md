@@ -11,6 +11,14 @@ description: >-
 
 # HyperFrames Overview
 
+## Export-Safe Backgrounds
+
+PNG/PDF/PPTX export uses html2canvas. Do not rely on CSS `mask-image` or `-webkit-mask-image` for visible slide background fades. Browser preview can render masks while html2canvas drops or changes them, which makes PPTX output differ from the overview.
+
+For image-to-text fades, use actual overlay layers such as `.slide-bg::before` and `.slide-bg::after` with `linear-gradient()` or `radial-gradient()`. Keep the image itself unmasked. The overview and exported PNG/PDF/PPTX must use the same CSS rendering path.
+
+When capturing a slide, use the active scene's computed `background-color` as both the offscreen stage background and the html2canvas `backgroundColor`. Do not hard-code black or transparent backgrounds unless the scene itself is black.
+
 ## 스킬 구조
 
 이 스킬은 오버뷰 작업의 **상위 스킬**이다.
