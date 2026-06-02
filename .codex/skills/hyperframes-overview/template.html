@@ -184,7 +184,9 @@
       }
       .detail-frame .scene.active { display: flex; }
       .detail-frame .scene.image-right.active,
-      .detail-frame .scene.image-left.active {
+      .detail-frame .scene.image-left.active,
+      .detail-frame .scene.image-led.active,
+      .detail-frame .scene.visual-bullets.active {
         display: grid;
       }
 
@@ -214,6 +216,15 @@
         box-shadow: rgba(var(--ui-accent-rgb), 0.35) 0px 4px 12px;
       }
       .aim-btn.active::before { box-shadow: inset 0 0 0 2px var(--ui-accent); }
+      .export-btn {
+        padding: 7px 14px; border-radius: 8px;
+        background: var(--ui-card);
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        color: var(--ui-text);
+        cursor: pointer; font-size: 13px; font-weight: 600;
+        font-family: 'Inter', 'Noto Sans KR', sans-serif;
+      }
+      .export-btn:hover { border-color: var(--ui-accent); color: var(--ui-accent); }
       body.aim-active { cursor: crosshair; }
       body.aim-active *:not(.aim-overlay):not(.aim-tooltip):not(.aim-toast):not(.aim-toast *) { cursor: crosshair !important; }
       .aim-overlay {
@@ -257,6 +268,23 @@
         font-family: 'Inter', monospace; font-size: 11px;
         color: rgba(255, 255, 255, 0.75);
         word-break: break-all; line-height: 1.4;
+      }
+      .export-progress { margin-top: 10px; min-width: 320px; }
+      .export-progress-head {
+        display: flex; justify-content: space-between; gap: 18px;
+        font-size: 12px; font-weight: 800; color: #fff;
+      }
+      .export-progress-track {
+        height: 8px; margin-top: 8px; border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18); overflow: hidden;
+      }
+      .export-progress-bar {
+        height: 100%; width: 0; background: var(--ui-accent);
+        transition: width 0.18s ease;
+      }
+      .export-progress-detail {
+        margin-top: 7px; font-size: 11px; line-height: 1.45;
+        color: rgba(255, 255, 255, 0.75);
       }
 
       /* ============ Text edit mode ============ */
@@ -327,7 +355,8 @@
         .main-header,
         .aim-overlay,
         .aim-tooltip,
-        .aim-toast {
+        .aim-toast,
+        .export-progress {
           display: none !important;
         }
         .main {
@@ -370,7 +399,11 @@
         .detail-frame .scene.image-right,
         .detail-frame .scene.image-right.active,
         .detail-frame .scene.image-left,
-        .detail-frame .scene.image-left.active {
+        .detail-frame .scene.image-left.active,
+        .detail-frame .scene.image-led,
+        .detail-frame .scene.image-led.active,
+        .detail-frame .scene.visual-bullets,
+        .detail-frame .scene.visual-bullets.active {
           display: grid !important;
         }
         .detail-frame .scene:last-child {
@@ -429,6 +462,8 @@
       }
       .slide-num .sep { margin: 0 8px; color: var(--text-meta, var(--ui-text-dim)); }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="assets/vendor/pptxgen.bundle.js?v=20260603"></script>
   </head>
   <body>
 
@@ -442,6 +477,7 @@
         <div class="main-title">{{TOPIC_ID}} · Overview</div>
         <div class="header-right">
           <button class="order-btn" id="nav-save-order">순서 저장</button>
+          <button class="export-btn" id="nav-export-pptx">PPTX</button>
           <button class="history-btn" id="nav-undo" title="Undo: Ctrl+Z" aria-label="undo">↶</button>
           <button class="history-btn" id="nav-redo" title="Redo: Ctrl+Y / Ctrl+Shift+Z" aria-label="redo">↷</button>
           <button class="edit-btn" id="nav-edit" aria-label="text edit">Edit</button>
@@ -737,6 +773,89 @@
           if (toastTimer) clearTimeout(toastTimer);
           toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
         }
+        function showExportToast(title, msg) {
+          toast.innerHTML =
+            '<div class="toast-title">' + title.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
+            '<div class="toast-sel">' + msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+          toast.classList.add('show');
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+        function showExportProgress(title, done, total, detail) {
+          const pct = total ? Math.max(0, Math.min(100, Math.round(done / total * 100))) : 0;
+          const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const safeDetail = (detail || '진행 중...').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          toast.innerHTML =
+            '<div class="toast-title">' + safeTitle + '</div>' +
+            '<div class="export-progress">' +
+            '<div class="export-progress-head"><span>' + done + ' / ' + total + '</span><span>' + pct + '%</span></div>' +
+            '<div class="export-progress-track"><div class="export-progress-bar" style="width:' + pct + '%"></div></div>' +
+            '<div class="export-progress-detail">' + safeDetail + '</div>' +
+            '</div>';
+          toast.classList.add('show');
+          if (toastTimer) clearTimeout(toastTimer);
+        }
+        function pptxCtor() {
+          const mod = window.pptxgen || window.pptxgenjs || window.PptxGenJS || window.PPTXGenJS;
+          return typeof mod === 'function' ? mod : (mod && typeof mod.default === 'function' ? mod.default : null);
+        }
+        async function waitForAssets(root) {
+          if (document.fonts && document.fonts.ready) await document.fonts.ready;
+          const imgs = Array.from(root.querySelectorAll('img'));
+          await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload = img.onerror = res; })));
+          await Promise.all(imgs.map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve()));
+        }
+        function makeExportScene(scene) {
+          const clone = scene.cloneNode(true);
+          clone.classList.add('active');
+          clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+          clone.style.setProperty('position', 'relative', 'important');
+          clone.style.setProperty('display', getComputedStyle(scene).display, 'important');
+          clone.style.setProperty('visibility', 'visible', 'important');
+          clone.style.setProperty('transform', 'none', 'important');
+          clone.style.setProperty('inset', 'auto', 'important');
+          clone.style.setProperty('width', '1920px', 'important');
+          clone.style.setProperty('height', '1080px', 'important');
+          return clone;
+        }
+        async function captureSlide(n) {
+          if (typeof html2canvas === 'undefined') throw new Error('html2canvas를 불러오지 못했습니다.');
+          const scene = scenes[n - 1];
+          const stage = document.createElement('div');
+          stage.style.cssText = 'position:fixed;left:-10000px;top:0;width:1920px;height:1080px;background:#000;overflow:hidden;z-index:-1;';
+          const clone = makeExportScene(scene);
+          stage.appendChild(clone);
+          document.body.appendChild(stage);
+          await waitForAssets(stage);
+          const canvas = await html2canvas(clone, { backgroundColor: null, width: 1920, height: 1080, scale: 1, useCORS: true, logging: false });
+          stage.remove();
+          return canvas;
+        }
+        async function exportPptx() {
+          const PptxGen = pptxCtor();
+          if (!PptxGen) {
+            showExportToast('PPTX 저장 불가', 'PptxGenJS를 불러오지 못했습니다. 새로고침 후 다시 시도하세요.');
+            return;
+          }
+          const pptx = new PptxGen();
+          pptx.layout = 'LAYOUT_WIDE';
+          pptx.author = '{{TOPIC_ID}}';
+          pptx.subject = '{{TOPIC_ID}}';
+          pptx.title = '{{TOPIC_ID}}';
+          const total = scenes.length;
+          showExportProgress('PPTX 내보내기', 0, total, 'Full HD 슬라이드 캡처를 시작합니다.');
+          for (let i = 1; i <= total; i++) {
+            showExportProgress('PPTX 내보내기', i - 1, total, `슬라이드 ${i} / ${total} 캡처 중...`);
+            const canvas = await captureSlide(i);
+            const slide = pptx.addSlide();
+            slide.background = { color: '000000' };
+            slide.addImage({ data: canvas.toDataURL('image/png'), x: 0, y: 0, w: 13.333, h: 7.5 });
+            showExportProgress('PPTX 내보내기', i, total, `슬라이드 ${i} / ${total} PPTX 추가 완료`);
+          }
+          showExportProgress('PPTX 내보내기', total, total, 'PPTX 파일 저장 중...');
+          await pptx.writeFile({ fileName: '{{TOPIC_ID}}.pptx' });
+          showExportToast('PPTX 저장 완료', '슬라이드 순서대로 하나의 PPTX를 만들었습니다.');
+        }
         function copyToClipboard(text) {
           if (navigator.clipboard && window.isSecureContext !== false) {
             return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
@@ -978,6 +1097,8 @@
         });
         if (undoBtn) undoBtn.addEventListener('click', (e) => { e.stopPropagation(); undoEdit(); });
         if (redoBtn) redoBtn.addEventListener('click', (e) => { e.stopPropagation(); redoEdit(); });
+        const exportPptxBtn = document.getElementById('nav-export-pptx');
+        if (exportPptxBtn) exportPptxBtn.addEventListener('click', () => exportPptx().catch(e => showExportToast('PPTX 내보내기 실패', e.message || String(e))));
 
         document.addEventListener('input', (e) => {
           if (editMode && e.target && e.target.isContentEditable) scheduleEditHistory();

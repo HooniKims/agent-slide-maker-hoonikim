@@ -54,6 +54,9 @@ description: >-
 - 썸네일 라벨(`.thumb-label`)은 슬라이드 내용을 가리지 않게 기본 숨김, hover 때만 표시한다.
 - Edit → Done 후에는 변경된 슬라이드 번호에 대해 `syncThumbFromScene(n)` 로 오른쪽 최신 DOM을 다시 clone 해서 좌측 썸네일을 즉시 갱신한다.
 - PDF/print/export 는 좌측 strip 기준이 아니라 우측 `#detail-frame` 안의 원본 슬라이드 기준이어야 한다. `@media print` 에서 `.strip`, `.main-header`, Aim/Edit UI를 숨기고, `.detail-frame .scene` 전체를 1920×1080 페이지 단위로 출력한다.
+- PNG/PDF/PPTX처럼 시간이 걸리는 export 버튼에는 진행률 UI를 반드시 넣는다. 캡처 루프마다 `현재 / 전체`, `%`, 현재 단계 메시지를 갱신하고, 막대가 0%에서 100%까지 차도록 만든다. 파일 조립/저장 단계가 남아 있으면 100% 상태에서 "파일 저장 중..." 메시지를 표시한다.
+- PPTX 내보내기는 외부 CDN의 `pptxgenjs`를 직접 의존하지 않는다. `vendor/pptxgen.bundle.js`를 topic의 `assets/vendor/pptxgen.bundle.js`로 복사하고, overview에서는 `assets/vendor/pptxgen.bundle.js?v=20260603`처럼 로컬 경로와 캐시 무효화 쿼리를 사용한다.
+- PPTX 생성자 감지는 `window.pptxgen`, `window.pptxgenjs`, `window.PptxGenJS`, `window.PPTXGenJS`, `mod.default`를 모두 확인한다. 하나만 가정하면 브라우저/번들 형태에 따라 `PptxGenJS를 불러오지 못했습니다` 오류가 재발한다.
 - 이 규칙은 샘플 토픽뿐 아니라 새로 생성하는 모든 16:9 overview.html 에 적용한다.
 
 ## 파일 구조
@@ -62,6 +65,8 @@ description: >-
 .codex/skills/hyperframes-overview/
 ├── SKILL.md         (이 파일)
 ├── template.html    (재사용 가능한 베이스 템플릿)
+├── vendor/
+│   └── pptxgen.bundle.js  (PPTX 내보내기 로컬 vendor)
 └── serve.sh         (로컬 HTTP 서버 실행 스크립트 — CORS 회피용)
 ```
 
@@ -130,6 +135,7 @@ description: >-
 
 - **이미지가 없는 덱**: 브라우저에서 `file:///...topics/<주제>/overview.html` 경로로 바로 열어도 동작.
 - **이미지가 있는 덱**: 아래 "이미지 & CORS 대응" 절차를 따라 HTTP 서버로 서빙할 것.
+- **PPTX 내보내기가 있는 덱**: `template.html`의 PPTX 버튼을 사용한다면 `topics/<주제>/assets/vendor/pptxgen.bundle.js`가 반드시 있어야 한다. 없으면 이 스킬의 `vendor/pptxgen.bundle.js`를 복사한다.
 - `npx hyperframes lint`는 overview.html을 검사하지 않으므로 별도 lint 불필요.
 
 ## 이미지 & CORS 대응
@@ -167,6 +173,7 @@ bash .codex/skills/hyperframes-overview/serve.sh topics/<주제> 9000
 사용자가 "여기 이미지 넣어줘" 라고 요청했을 때 다음 순서로 처리:
 
 - [ ] 원본 파일을 `topics/<주제>/assets/` 에 배치 (외부 URL이면 `curl`로 다운로드)
+- [ ] PPTX 버튼을 포함한 overview라면 `topics/<주제>/assets/vendor/pptxgen.bundle.js`가 있는지 확인하고, 없으면 `.codex/skills/hyperframes-overview/vendor/pptxgen.bundle.js`에서 복사
 - [ ] 해당 슬라이드의 `index.html`과 `overview.html` **양쪽**에 `<img src="assets/파일명" alt="설명" />` 삽입
 - [ ] 슬라이드 레이아웃에 맞게 CSS 조정 (예: `.split-image img { width: 100%; height: 100%; object-fit: contain; }`)
 - [ ] 기존 preview 서버가 꺼져 있다면 `serve.sh`로 HTTP 서버 기동 — `file://`로 열면 이미지가 깨질 수 있으므로 반드시 http://로 확인
@@ -174,7 +181,7 @@ bash .codex/skills/hyperframes-overview/serve.sh topics/<주제> 9000
 
 ## 원칙
 
-- **한 파일 완결**: 외부 JS/CSS 없이 구글 폰트 CDN만 사용. 오프라인에서도 구조는 동작.
+- **한 파일 중심**: 오버뷰 HTML은 단일 파일 중심으로 동작하되, PPTX 내보내기처럼 큰 브라우저 라이브러리는 `assets/vendor/`의 로컬 파일을 사용한다. CDN 직접 의존만으로 PPTX를 구현하지 않는다.
 - **애니메이션 없음**: 모든 요소는 최종 상태로 렌더링. GSAP, `data-start`, `opacity: 0` 등 애니메이션 관련 속성 금지.
 - **UI 크롬과 씬 스타일의 분리**: UI chrome은 `--ui-*` 변수로, 씬 스타일은 topic의 `--accent`/`--text` 등을 사용. 이름 충돌 없도록 확실히 구분.
 - **셀렉터 앵커링**: 모든 셀렉터는 `[data-slide="N"]`로 시작해야 재현 가능. `id`나 nth-child에 의존하지 말 것.
