@@ -805,12 +805,20 @@
           await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload = img.onerror = res; })));
           await Promise.all(imgs.map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve()));
         }
+        function activeSceneDisplay(scene) {
+          const wasActive = scene.classList.contains('active');
+          scene.classList.add('active');
+          const display = getComputedStyle(scene).display;
+          if (!wasActive) scene.classList.remove('active');
+          return display;
+        }
+
         function makeExportScene(scene) {
           const clone = scene.cloneNode(true);
           clone.classList.add('active');
           clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
           clone.style.setProperty('position', 'relative', 'important');
-          clone.style.setProperty('display', getComputedStyle(scene).display, 'important');
+          clone.style.setProperty('display', activeSceneDisplay(scene), 'important');
           clone.style.setProperty('visibility', 'visible', 'important');
           clone.style.setProperty('transform', 'none', 'important');
           clone.style.setProperty('inset', 'auto', 'important');
